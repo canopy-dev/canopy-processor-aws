@@ -1,6 +1,6 @@
 # canopy-processor-aws
 
-[![Test](https://github.com/joeweiss/canopy-processor-aws/actions/workflows/test.yml/badge.svg)](https://github.com/joeweiss/canopy-processor-aws/actions/workflows/test.yml)
+[![Test](https://github.com/canopy-dev/canopy-processor-aws/actions/workflows/test.yml/badge.svg)](https://github.com/canopy-dev/canopy-processor-aws/actions/workflows/test.yml)
 
 An acoustic detection runner compatible with canopy-api for use on AWS EC2 instances (Ubuntu)
 
