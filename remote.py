@@ -5,6 +5,7 @@ import os
 from botocore.exceptions import ClientError
 from birdnetlib import LargeRecording as Recording
 from birdnetlib.analyzer import LargeRecordingAnalyzer as Analyzer
+from birdnetlib.exceptions import AudioFormatError
 import json
 import hashlib
 import time
@@ -97,6 +98,35 @@ class Remote:
     def _save_results_to_server(self):
         # TODO: Handle 404 and 500 with fibonacci backoff
         data = self._format_results_for_api()
+        data["api_key"] = self.api_key  # Add api_key to outgoing request
+        audio_id = self.queued_audio_dict["id"]
+        results_endpoint = f"{self.api_endpoint}/queues/audio/{audio_id}/results/"
+        response = requests.post(
+            results_endpoint,
+            json=data,
+            headers=self.api_headers,
+            verify=self.verify_request,
+        )
+        if response.status_code != 201:
+            raise ConnectionError(
+                f"Remote could not connect to API endpoint (status {response.status_code})."
+            )
+        data = response.json()
+        if data == {}:
+            return None
+        return data
+
+    def _save_error_to_server(self, error_message=""):
+        config_id = self.queued_audio_dict["group"]["analyzer_config"]["id"]
+        data = {
+            "config_id": config_id,
+            "analyzer_instance_id": self.instance_id,
+            "analyzer_instance_type": self.instance_type,
+            "analyzer_duration_seconds": self.analyzer_duration_seconds,
+            "analyzer_version": self.analyzer.version,
+            "error": True,
+            "error_message": error_message,
+        }
         data["api_key"] = self.api_key  # Add api_key to outgoing request
         audio_id = self.queued_audio_dict["id"]
         results_endpoint = f"{self.api_endpoint}/queues/audio/{audio_id}/results/"
@@ -393,7 +423,12 @@ class Remote:
             self.queued_audio_dict = self._return_queue_item()
             if self.queued_audio_dict:
                 self._retrieve_file()
-                self._analyze_file()
+                try:
+                    self._analyze_file()
+                except AudioFormatError as e:
+                    print(e)
+                    self._save_error_to_server(error_message=f"AudioFormatError: {e}")
+                    return
                 self._extract_detections_as_audio()
                 self._extract_detections_as_spectrogram()
                 self._upload_extractions()
